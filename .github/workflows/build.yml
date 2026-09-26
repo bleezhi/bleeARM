@@ -5,14 +5,14 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: "create a GitHub release"
+        description: create a GitHub release
         required: true
-        default: "false"
+        default: 'false'
         type: boolean
       version:
-        description: "release version, e.g. 0.1.0"
+        description: release version
         required: false
-        default: "0.1.0"
+        default: '0.2.0'
 
 jobs:
   build:
@@ -20,35 +20,31 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       - name: install dependencies
-        run: sudo apt-get update && sudo apt-get install -y busybox-static xorriso
-      - name: build rootfs
+        run: sudo apt-get update && sudo apt-get install -y busybox-static cpio xz-utils gzip qemu-utils qemu-system-arm
+      - name: build
         run: chmod +x build.sh && ./build.sh
       - name: build test ISO
         run: |
-          rm -rf iso-root
           mkdir -p iso-root/bleeARM
-          cp out/bleeARM-rootfs.tar.gz iso-root/bleeARM/
+          cp out/initramfs.cpio.gz iso-root/bleeARM/
           cp README.md iso-root/
           xorriso -as mkisofs -V BLEEARM_TEST -o out/bleeARM-qemu-test.iso iso-root
-      - name: build partition examples
+      - name: partition examples
         run: |
-          rm -rf partitions
           mkdir -p partitions/system partitions/boot
           cp -a out/rootfs/. partitions/system/
-          printf '%s\n' 'bleeARM boot partition example.' 'This is an example layout until the real TB-8505F boot chain is integrated.' 'Future contents: kernel/Image, device tree, boot configuration and related boot files.' > partitions/boot/README.txt
-          mkdir -p out/partitions
+          printf '%s\n' 'bleeARM boot partition example.' 'Reserved for the TB-8505F kernel, device tree and boot configuration.' > partitions/boot/README.txt
           tar -C partitions -czf out/bleeARM-partitions-examples.tar.gz system boot
       - name: checksums
         run: |
           mkdir -p release
           cp out/bleeARM-qemu-test.iso release/
           cp out/bleeARM-partitions-examples.tar.gz release/
+          cp out/initramfs.cpio.gz release/
           sha256sum release/* > release/SHA256SUMS
-      - name: upload CI artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: bleeARM-${{ github.sha }}
           path: release/
@@ -63,4 +59,5 @@ jobs:
           files: |
             release/bleeARM-qemu-test.iso
             release/bleeARM-partitions-examples.tar.gz
+            release/initramfs.cpio.gz
             release/SHA256SUMS
