@@ -12,7 +12,7 @@ on:
       version:
         description: release version
         required: false
-        default: '0.2.0'
+        default: '0.3.0'
 
 jobs:
   build:
@@ -21,34 +21,53 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+
       - name: install dependencies
-        run: sudo apt-get update && sudo apt-get install -y busybox-static cpio xz-utils gzip qemu-utils qemu-system-arm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            busybox-static cpio xz-utils gzip qemu-utils qemu-system-arm \
+            xorriso gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            bc bison flex libssl-dev libelf-dev make curl
+
       - name: build
         run: chmod +x build.sh && ./build.sh
+
       - name: build test ISO
         run: |
           mkdir -p iso-root/bleeARM
+          cp out/Image iso-root/bleeARM/
           cp out/initramfs.cpio.gz iso-root/bleeARM/
           cp README.md iso-root/
           xorriso -as mkisofs -V BLEEARM_TEST -o out/bleeARM-qemu-test.iso iso-root
+
       - name: partition examples
         run: |
           mkdir -p partitions/system partitions/boot
           cp -a out/rootfs/. partitions/system/
-          printf '%s\n' 'bleeARM boot partition example.' 'Reserved for the TB-8505F kernel, device tree and boot configuration.' > partitions/boot/README.txt
+          cp out/Image partitions/boot/
+          printf '%s\n' \
+            'bleeARM boot partition example.' \
+            'The included Image is for QEMU aarch64 virt testing.' \
+            'The Lenovo TB-8505F will require its own kernel, device tree and boot format.' \
+            > partitions/boot/README.txt
           tar -C partitions -czf out/bleeARM-partitions-examples.tar.gz system boot
+
       - name: checksums
         run: |
           mkdir -p release
           cp out/bleeARM-qemu-test.iso release/
           cp out/bleeARM-partitions-examples.tar.gz release/
           cp out/initramfs.cpio.gz release/
+          cp out/Image release/bleeARM-qemu-Image
           sha256sum release/* > release/SHA256SUMS
+
       - uses: actions/upload-artifact@v4
         with:
           name: bleeARM-${{ github.sha }}
           path: release/
           retention-days: 30
+
       - name: create GitHub release
         if: github.event_name == 'workflow_dispatch' && inputs.release == true
         uses: softprops/action-gh-release@v2
@@ -60,4 +79,5 @@ jobs:
             release/bleeARM-qemu-test.iso
             release/bleeARM-partitions-examples.tar.gz
             release/initramfs.cpio.gz
+            release/bleeARM-qemu-Image
             release/SHA256SUMS
