@@ -1,0 +1,24 @@
+name: build bleeARM
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: install dependencies
+        run: sudo apt-get update && sudo apt-get install -y busybox
+      - name: build
+        run: chmod +x build.sh && ./build.sh
+      - name: package
+        run: mkdir -p release && cp out/bleeARM-rootfs.tar.gz release/ && sha256sum release/bleeARM-rootfs.tar.gz > release/SHA256SUMS
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bleeARM-${{ github.sha }}
+          path: release/
+          retention-days: 30
