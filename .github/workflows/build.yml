@@ -3,22 +3,64 @@ name: build bleeARM
 on:
   push:
   workflow_dispatch:
+    inputs:
+      release:
+        description: "create a GitHub release"
+        required: true
+        default: "false"
+        type: boolean
+      version:
+        description: "release version, e.g. 0.1.0"
+        required: false
+        default: "0.1.0"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: checkout
         uses: actions/checkout@v4
       - name: install dependencies
-        run: sudo apt-get update && sudo apt-get install -y busybox
-      - name: build
+        run: sudo apt-get update && sudo apt-get install -y busybox-static xorriso
+      - name: build rootfs
         run: chmod +x build.sh && ./build.sh
-      - name: package
-        run: mkdir -p release && cp out/bleeARM-rootfs.tar.gz release/ && sha256sum release/bleeARM-rootfs.tar.gz > release/SHA256SUMS
-      - name: upload artifact
+      - name: build test ISO
+        run: |
+          rm -rf iso-root
+          mkdir -p iso-root/bleeARM
+          cp out/bleeARM-rootfs.tar.gz iso-root/bleeARM/
+          cp README.md iso-root/
+          xorriso -as mkisofs -V BLEEARM_TEST -o out/bleeARM-qemu-test.iso iso-root
+      - name: build partition examples
+        run: |
+          rm -rf partitions
+          mkdir -p partitions/system partitions/boot
+          cp -a out/rootfs/. partitions/system/
+          printf '%s\n' 'bleeARM boot partition example.' 'This is an example layout until the real TB-8505F boot chain is integrated.' 'Future contents: kernel/Image, device tree, boot configuration and related boot files.' > partitions/boot/README.txt
+          mkdir -p out/partitions
+          tar -C partitions -czf out/bleeARM-partitions-examples.tar.gz system boot
+      - name: checksums
+        run: |
+          mkdir -p release
+          cp out/bleeARM-qemu-test.iso release/
+          cp out/bleeARM-partitions-examples.tar.gz release/
+          sha256sum release/* > release/SHA256SUMS
+      - name: upload CI artifacts
         uses: actions/upload-artifact@v4
         with:
           name: bleeARM-${{ github.sha }}
           path: release/
           retention-days: 30
+      - name: create GitHub release
+        if: github.event_name == 'workflow_dispatch' && inputs.release == true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: bleeARM v${{ inputs.version }}
+          generate_release_notes: true
+          files: |
+            release/bleeARM-qemu-test.iso
+            release/bleeARM-partitions-examples.tar.gz
+            release/SHA256SUMS
