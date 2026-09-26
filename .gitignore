@@ -1,0 +1,6 @@
+out/
+release/
+*.img
+*.img.gz
+*.tar
+*.tar.gz
