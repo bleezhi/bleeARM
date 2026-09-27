@@ -77,8 +77,8 @@ mkdir -p "$ROOTFS/lib/modules"
 # Create the required newc CPIO archive without a shell pipeline.
 (
   cd "$ROOTFS"
-  find . -xdev -print > "$OUT/filelist.txt"
-  cpio -o -H newc -F "$OUT/initramfs.cpio" < "$OUT/filelist.txt"
+  sudo find . -xdev -print > "$OUT/filelist.txt"
+  sudo cpio -o -H newc -F "$OUT/initramfs.cpio" < "$OUT/filelist.txt"
 )
 gzip -1 -f "$OUT/initramfs.cpio"
 rm -f "$OUT/filelist.txt"
