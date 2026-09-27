@@ -46,6 +46,9 @@ sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' "$BUSYBOX_DIR/.config"
 # BusyBox 1.37.0's tc applet expects legacy CBQ netlink definitions
 # removed from current Ubuntu kernel headers. bleeARM does not need tc yet.
 sed -i 's/^CONFIG_TC=y$/CONFIG_TC=n/' "$BUSYBOX_DIR/.config"
+# BusyBox 1.37.0 enables x86 SHA-NI support in defconfig, but that
+# implementation is not available when cross-compiling for ARM64.
+sed -i 's/^CONFIG_SHA1_HWACCEL=y$/CONFIG_SHA1_HWACCEL=n/' "$BUSYBOX_DIR/.config"
 make -C "$BUSYBOX_DIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)"
 make -C "$BUSYBOX_DIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CONFIG_PREFIX="$ROOTFS" install
 
