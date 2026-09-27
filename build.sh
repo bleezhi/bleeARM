@@ -6,19 +6,38 @@ OUT="$ROOT/out"
 ROOTFS="$OUT/rootfs"
 KERNEL_VERSION="6.18"
 KERNEL_DIR="$OUT/linux-$KERNEL_VERSION"
-BUSYBOX_VERSION="1.37.0"
-BUSYBOX_DIR="$OUT/busybox-$BUSYBOX_VERSION"
+ARCH_ROOTFS_URL="https://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz"
 
 rm -rf "$OUT"
-mkdir -p "$ROOTFS"/{bin,sbin,etc,proc,sys,dev,tmp,root,usr/bin,var,run}
+mkdir -p "$OUT" "$ROOTFS"
 
+echo "downloading Arch Linux ARM AArch64 userspace..."
+curl -L --fail --retry 3 "$ARCH_ROOTFS_URL" -o "$OUT/archlinuxarm.tar.gz"
+
+echo "extracting Arch Linux ARM userspace..."
+bsdtar -xpf "$OUT/archlinuxarm.tar.gz" -C "$ROOTFS"
+rm -f "$OUT/archlinuxarm.tar.gz"
+
+echo "customizing bleeARM userspace..."
 cat > "$ROOTFS/etc/os-release" <<'EOF'
 NAME="bleeARM"
 ID=bleearm
-PRETTY_NAME="bleeARM experimental ARM OS"
-VERSION="0.3-dev"
-VERSION_ID="0.3"
+ID_LIKE=arch
+PRETTY_NAME="bleeARM - Arch Linux ARM based"
+VERSION="0.4-dev"
+VERSION_ID="0.4"
+BUILD_ID="qemu-aarch64"
 EOF
+
+cat > "$ROOTFS/etc/bleearm-release" <<'EOF'
+bleeARM 0.4-dev
+base: Arch Linux ARM
+architecture: aarch64
+qemu target: aarch64 virt
+hardware target: Lenovo TB-8505F
+EOF
+
+printf '%s\n' 'bleearm' > "$ROOTFS/etc/hostname"
 
 cat > "$ROOTFS/init" <<'EOF'
 #!/bin/sh
@@ -26,35 +45,28 @@ mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sysfs /sys 2>/dev/null || true
 mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
 mount -t tmpfs tmpfs /run 2>/dev/null || true
+
 echo
-echo "bleeARM 0.3-dev"
+echo "bleeARM 0.4-dev"
+echo "base: Arch Linux ARM"
+echo "architecture: aarch64"
 echo "target: Lenovo TB-8505F"
 echo "qemu target: aarch64 virt"
-echo "userspace: BusyBox (Debian/Fedora userspace planned)"
 echo
-exec /bin/sh
+echo "Arch Linux ARM userspace is ready."
+echo "Run 'pacman-key --init && pacman-key --populate archlinuxarm' before using pacman."
+echo
+
+export HOME=/root
+export PS1='bleeARM# '
+exec /bin/bash
 EOF
 chmod +x "$ROOTFS/init"
 
-echo "building ARM64 BusyBox $BUSYBOX_VERSION..."
-curl -L --fail --retry 3   "https://busybox.net/downloads/busybox-$BUSYBOX_VERSION.tar.bz2"   -o "$OUT/busybox.tar.bz2"
-tar -xf "$OUT/busybox.tar.bz2" -C "$OUT"
-rm -f "$OUT/busybox.tar.bz2"
+echo "verifying Arch userspace architecture..."
+aarch64-linux-gnu-readelf -h "$ROOTFS/bin/bash" | grep -E 'Class:.*ELF64|Machine:.*AArch64'
 
-make -C "$BUSYBOX_DIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
-sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' "$BUSYBOX_DIR/.config"
-# BusyBox 1.37.0's tc applet expects legacy CBQ netlink definitions
-# removed from current Ubuntu kernel headers. bleeARM does not need tc yet.
-sed -i 's/^CONFIG_TC=y$/CONFIG_TC=n/' "$BUSYBOX_DIR/.config"
-# BusyBox 1.37.0 enables x86 SHA-NI support in defconfig, but that
-# implementation is not available when cross-compiling for ARM64.
-sed -i 's/^CONFIG_SHA1_HWACCEL=y$/CONFIG_SHA1_HWACCEL=n/' "$BUSYBOX_DIR/.config"
-make -C "$BUSYBOX_DIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)"
-make -C "$BUSYBOX_DIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CONFIG_PREFIX="$ROOTFS" install
-
-echo "verifying BusyBox architecture..."
-aarch64-linux-gnu-readelf -h "$ROOTFS/bin/busybox" | grep -E 'Class:.*ELF64|Machine:.*AArch64'
-
+echo "creating initramfs..."
 mkdir -p "$ROOTFS/lib/modules"
 (cd "$ROOTFS" && find . -print0 | cpio --null -ov --format=newc 2>/dev/null | gzip -9) > "$OUT/initramfs.cpio.gz"
 
@@ -70,6 +82,6 @@ echo "building Linux Image..."
 make -C "$KERNEL_DIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)" Image
 cp "$KERNEL_DIR/arch/arm64/boot/Image" "$OUT/Image"
 
-printf 'built ARM64 BusyBox rootfs: %s\n' "$ROOTFS"
+printf 'built Arch Linux ARM rootfs: %s\n' "$ROOTFS"
 printf 'built kernel: %s\n' "$OUT/Image"
 printf 'built initramfs: %s\n' "$OUT/initramfs.cpio.gz"
