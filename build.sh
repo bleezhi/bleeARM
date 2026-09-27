@@ -6,7 +6,7 @@ OUT="$ROOT/out"
 ROOTFS="$OUT/rootfs"
 KERNEL_VERSION="6.18"
 KERNEL_DIR="$OUT/linux-$KERNEL_VERSION"
-ARCH_ROOTFS_URL="https://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz"
+ARCH_ROOTFS_URL="https://ca.us.mirror.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz"
 
 rm -rf "$OUT"
 mkdir -p "$OUT" "$ROOTFS"
@@ -37,7 +37,8 @@ qemu target: aarch64 virt
 hardware target: Lenovo TB-8505F
 EOF
 
-printf '%s\n' 'bleearm' > "$ROOTFS/etc/hostname"
+printf '%s
+' 'bleearm' > "$ROOTFS/etc/hostname"
 
 cat > "$ROOTFS/init" <<'EOF'
 #!/bin/sh
@@ -82,6 +83,9 @@ echo "building Linux Image..."
 make -C "$KERNEL_DIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)" Image
 cp "$KERNEL_DIR/arch/arm64/boot/Image" "$OUT/Image"
 
-printf 'built Arch Linux ARM rootfs: %s\n' "$ROOTFS"
-printf 'built kernel: %s\n' "$OUT/Image"
-printf 'built initramfs: %s\n' "$OUT/initramfs.cpio.gz"
+printf 'built Arch Linux ARM rootfs: %s
+' "$ROOTFS"
+printf 'built kernel: %s
+' "$OUT/Image"
+printf 'built initramfs: %s
+' "$OUT/initramfs.cpio.gz"
