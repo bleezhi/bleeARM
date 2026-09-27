@@ -25,10 +25,7 @@ jobs:
       - name: install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            busybox-static cpio xz-utils gzip qemu-utils qemu-system-arm \
-            xorriso gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
-            bc bison flex libssl-dev libelf-dev make curl
+          sudo apt-get install -y             cpio xz-utils bzip2 gzip qemu-utils qemu-system-arm             xorriso gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu             bc bison flex libssl-dev libelf-dev make curl
 
       - name: build
         run: chmod +x build.sh && ./build.sh
@@ -36,17 +33,11 @@ jobs:
       - name: test QEMU boot
         run: |
           set +e
-          timeout 30s qemu-system-aarch64 \
-            -M virt \
-            -cpu cortex-a53 \
-            -m 512M \
-            -kernel out/Image \
-            -initrd out/initramfs.cpio.gz \
-            -append "console=ttyAMA0 rdinit=/init" \
-            -nographic > qemu.log 2>&1
+          timeout 30s qemu-system-aarch64             -M virt             -cpu cortex-a53             -m 512M             -kernel out/Image             -initrd out/initramfs.cpio.gz             -append "console=ttyAMA0 rdinit=/init"             -nographic > qemu.log 2>&1
           status=$?
           cat qemu.log
           grep -q "bleeARM 0.3-dev" qemu.log
+          grep -q "Run /init as init process" qemu.log
           if [ "$status" -ne 0 ] && [ "$status" -ne 124 ]; then
             exit "$status"
           fi
@@ -64,11 +55,7 @@ jobs:
           mkdir -p partitions/system partitions/boot
           cp -a out/rootfs/. partitions/system/
           cp out/Image partitions/boot/
-          printf '%s\n' \
-            'bleeARM boot partition example.' \
-            'The included Image is for QEMU aarch64 virt testing.' \
-            'The Lenovo TB-8505F will require its own kernel, device tree and boot format.' \
-            > partitions/boot/README.txt
+          printf '%s\n'             'bleeARM boot partition example.'             'The included Image is for QEMU aarch64 virt testing.'             'The Lenovo TB-8505F will require its own kernel, device tree and boot format.'             > partitions/boot/README.txt
           tar -C partitions -czf out/bleeARM-partitions-examples.tar.gz system boot
 
       - name: checksums
