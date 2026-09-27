@@ -73,13 +73,17 @@ aarch64-linux-gnu-readelf -h "$ROOTFS/bin/bash" | grep -E 'Class:.*ELF64|Machine
 
 echo "creating initramfs..."
 mkdir -p "$ROOTFS/lib/modules"
-(cd "$ROOTFS" && find . -xdev -print0 | cpio --null -o --format=newc --no-preserve-owner > "$OUT/initramfs.cpio" 2>"$OUT/cpio-errors.log")
-if [ "$?" -ne 0 ]; then
-  cat "$OUT/cpio-errors.log" >&2
-  exit 1
-fi
-gzip -1 -f "$OUT/initramfs.cpio"
-rm -f "$OUT/cpio-errors.log"
+
+# Build a deterministic file list first. This avoids a live find|cpio pipe,
+# which can turn downstream failures into misleading "Broken pipe" errors.
+(
+  cd "$ROOTFS"
+  find . -xdev -print > "$OUT/filelist.txt"
+)
+tar -C "$ROOTFS" -cf "$OUT/rootfs.tar" -T "$OUT/filelist.txt" --format=ustar
+gzip -1 -f "$OUT/rootfs.tar"
+mv "$OUT/rootfs.tar.gz" "$OUT/initramfs.cpio.gz"
+rm -f "$OUT/filelist.txt"
 
 echo "downloading Linux $KERNEL_VERSION..."
 curl -L --fail --retry 3 "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KERNEL_VERSION.tar.xz" -o "$OUT/linux.tar.xz"
