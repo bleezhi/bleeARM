@@ -15,7 +15,7 @@ echo "downloading Arch Linux ARM AArch64 userspace..."
 curl -L --fail --retry 3 "$ARCH_ROOTFS_URL" -o "$OUT/archlinuxarm.tar.gz"
 
 echo "extracting Arch Linux ARM userspace..."
-bsdtar -xpf "$OUT/archlinuxarm.tar.gz" -C "$ROOTFS"
+bsdtar -xpf "$OUT/archlinuxarm.tar.gz" --no-xattrs --no-acls --no-fflags -C "$ROOTFS"
 rm -f "$OUT/archlinuxarm.tar.gz"
 
 echo "customizing bleeARM userspace..."
