@@ -61,24 +61,27 @@ jobs:
           cp README.md iso-root/
           xorriso -as mkisofs -V BLEEARM_TEST -o out/bleeARM-qemu-test.iso iso-root
 
-      - name: partition examples
+      - name: package partition examples
         run: |
-          mkdir -p partitions/system partitions/boot
-          cp -a out/rootfs/. partitions/system/
+          mkdir -p partitions/boot
           cp out/Image partitions/boot/
           printf '%s\n' \
             'bleeARM boot partition example.' \
             'The included Image is for QEMU aarch64 virt testing.' \
-            'The system partition contains the Arch Linux ARM based bleeARM userspace.' \
             'The Lenovo TB-8505F will require its own kernel, device tree and boot format.' \
             > partitions/boot/README.txt
-          tar -C partitions -czf out/bleeARM-partitions-examples.tar.gz system boot
+          tar -C partitions -czf out/bleeARM-boot-example.tar.gz boot
+
+          # Do not duplicate the complete Arch rootfs into another directory.
+          # Archive it directly from out/rootfs.
+          tar -C out -czf out/bleeARM-system-rootfs.tar.gz rootfs
 
       - name: checksums
         run: |
           mkdir -p release
           cp out/bleeARM-qemu-test.iso release/
-          cp out/bleeARM-partitions-examples.tar.gz release/
+          cp out/bleeARM-boot-example.tar.gz release/
+          cp out/bleeARM-system-rootfs.tar.gz release/
           cp out/initramfs.cpio.gz release/
           cp out/Image release/bleeARM-qemu-Image
           sha256sum release/* > release/SHA256SUMS
@@ -98,7 +101,8 @@ jobs:
           generate_release_notes: true
           files: |
             release/bleeARM-qemu-test.iso
-            release/bleeARM-partitions-examples.tar.gz
+            release/bleeARM-boot-example.tar.gz
+            release/bleeARM-system-rootfs.tar.gz
             release/initramfs.cpio.gz
             release/bleeARM-qemu-Image
             release/SHA256SUMS
