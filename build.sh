@@ -40,6 +40,10 @@ EOF
 printf '%s
 ' 'bleearm' > "$ROOTFS/etc/hostname"
 
+# Keep the development initramfs small enough for GitHub Actions/QEMU.
+rm -rf "$ROOTFS/var/cache/pacman/pkg/"* "$ROOTFS/usr/share/doc/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/info/"* "$ROOTFS/usr/lib/debug/"*
+
+
 cat > "$ROOTFS/init" <<'EOF'
 #!/bin/sh
 mount -t proc proc /proc 2>/dev/null || true
@@ -69,7 +73,7 @@ aarch64-linux-gnu-readelf -h "$ROOTFS/bin/bash" | grep -E 'Class:.*ELF64|Machine
 
 echo "creating initramfs..."
 mkdir -p "$ROOTFS/lib/modules"
-(cd "$ROOTFS" && find . -xdev -print0 | cpio --null -o --format=newc --no-preserve-owner 2>"$OUT/cpio-errors.log" | gzip -9) > "$OUT/initramfs.cpio.gz"
+(cd "$ROOTFS" && find . -xdev -print0 | cpio --null -o --format=newc --no-preserve-owner 2>"$OUT/cpio-errors.log" | gzip -1) > "$OUT/initramfs.cpio.gz"
 if [ "${PIPESTATUS[0]}" -ne 0 ]; then
   cat "$OUT/cpio-errors.log" >&2
   exit 1
