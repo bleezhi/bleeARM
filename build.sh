@@ -6,6 +6,8 @@ OUT="$ROOT/out"
 ROOTFS="$OUT/rootfs"
 KERNEL_VERSION="6.18"
 KERNEL_DIR="$OUT/linux-$KERNEL_VERSION"
+BUSYBOX_VERSION="1.37.0"
+BUSYBOX_DIR="$OUT/busybox-$BUSYBOX_VERSION"
 
 rm -rf "$OUT"
 mkdir -p "$ROOTFS"/{bin,sbin,etc,proc,sys,dev,tmp,root,usr/bin,var,run}
@@ -34,16 +36,18 @@ exec /bin/sh
 EOF
 chmod +x "$ROOTFS/init"
 
-BUSYBOX="$(command -v busybox || true)"
-if [ -z "$BUSYBOX" ]; then
-  echo "busybox is required" >&2
-  exit 1
-fi
+echo "building ARM64 BusyBox $BUSYBOX_VERSION..."
+curl -L --fail --retry 3   "https://busybox.net/downloads/busybox-$BUSYBOX_VERSION.tar.bz2"   -o "$OUT/busybox.tar.bz2"
+tar -xf "$OUT/busybox.tar.bz2" -C "$OUT"
+rm -f "$OUT/busybox.tar.bz2"
 
-cp "$BUSYBOX" "$ROOTFS/bin/busybox"
-for cmd in sh mount echo cat ls mkdir uname; do
-  ln -sf busybox "$ROOTFS/bin/$cmd"
-done
+make -C "$BUSYBOX_DIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' "$BUSYBOX_DIR/.config"
+make -C "$BUSYBOX_DIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)"
+make -C "$BUSYBOX_DIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CONFIG_PREFIX="$ROOTFS" install
+
+echo "verifying BusyBox architecture..."
+aarch64-linux-gnu-readelf -h "$ROOTFS/bin/busybox" | grep -E 'Class:.*ELF64|Machine:.*AArch64'
 
 mkdir -p "$ROOTFS/lib/modules"
 (cd "$ROOTFS" && find . -print0 | cpio --null -ov --format=newc 2>/dev/null | gzip -9) > "$OUT/initramfs.cpio.gz"
@@ -60,5 +64,6 @@ echo "building Linux Image..."
 make -C "$KERNEL_DIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)" Image
 cp "$KERNEL_DIR/arch/arm64/boot/Image" "$OUT/Image"
 
+printf 'built ARM64 BusyBox rootfs: %s\n' "$ROOTFS"
 printf 'built kernel: %s\n' "$OUT/Image"
 printf 'built initramfs: %s\n' "$OUT/initramfs.cpio.gz"
