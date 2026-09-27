@@ -69,7 +69,11 @@ aarch64-linux-gnu-readelf -h "$ROOTFS/bin/bash" | grep -E 'Class:.*ELF64|Machine
 
 echo "creating initramfs..."
 mkdir -p "$ROOTFS/lib/modules"
-(cd "$ROOTFS" && find . -print0 | cpio --null -ov --format=newc 2>/dev/null | gzip -9) > "$OUT/initramfs.cpio.gz"
+(cd "$ROOTFS" && find . -xdev -print0 | cpio --null -o --format=newc --no-preserve-owner 2>"$OUT/cpio-errors.log" | gzip -9) > "$OUT/initramfs.cpio.gz"
+if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+  cat "$OUT/cpio-errors.log" >&2
+  exit 1
+fi
 
 echo "downloading Linux $KERNEL_VERSION..."
 curl -L --fail --retry 3 "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KERNEL_VERSION.tar.xz" -o "$OUT/linux.tar.xz"
